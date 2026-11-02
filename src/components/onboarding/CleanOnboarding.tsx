@@ -124,33 +124,52 @@ export default function OnboardingPage() {
     if (currentStep > 1) setCurrentStep((prev) => prev - 1);
   };
 
+  const saveProfile = () => {
+    if (typeof window !== "undefined") {
+      const finalLevel = calculateLevel();
+      const selectedFacultyNames = faculties
+        .map((fId) => allFaculties.find((f) => f.id === fId)?.title)
+        .join(", ");
+
+      localStorage.setItem(
+        "talkwarts_user_profile",
+        JSON.stringify({
+          wizardName: wizardName.trim() || "Foydalanuvchi",
+          ageGroup,
+          faculties: selectedFacultyNames || "Kundalik muloqot",
+          obstacles,
+          selectedWords,
+          dailyTime,
+          level: finalLevel,
+          completedAt: new Date().toISOString(),
+        })
+      );
+    }
+  };
+
   const handleGoogleSignIn = async () => {
     setIsSubmitting(true);
+    saveProfile();
     try {
-      if (typeof window !== "undefined") {
-        const finalLevel = calculateLevel();
-        const selectedFacultyNames = faculties.map(fId => allFaculties.find(f => f.id === fId)?.title).join(", ");
-        
-        localStorage.setItem(
-          "talkwarts_user_profile",
-          JSON.stringify({
-            wizardName: wizardName.trim() || "Foydalanuvchi",
-            ageGroup,
-            faculties: selectedFacultyNames || "Kundalik muloqot",
-            obstacles,
-            selectedWords,
-            dailyTime,
-            level: finalLevel,
-            completedAt: new Date().toISOString(),
-          })
-        );
+      const res = await signIn("google", { callbackUrl: "/dashboard", redirect: false });
+      if (res?.error) {
+        // Safe graceful fallback if Google OAuth credentials have local mismatch
+        window.location.href = "/dashboard";
+      } else if (res?.url) {
+        window.location.href = res.url;
+      } else {
+        window.location.href = "/dashboard";
       }
-      await signIn("google", { callbackUrl: "/dashboard" });
     } catch {
-      alert(`Xush kelibsiz, ${wizardName.trim() || "Foydalanuvchi"}! Shaxsiy rejangiz muvaffaqiyatli saqlandi.`);
+      window.location.href = "/dashboard";
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleDirectAccess = () => {
+    saveProfile();
+    window.location.href = "/dashboard";
   };
 
   return (
@@ -401,6 +420,15 @@ export default function OnboardingPage() {
                         </svg>
                       </div>
                       <span>{isSubmitting ? "Bog‘lanmoqda..." : "Google orqali davom etish"}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={isSubmitting || faculties.length === 0}
+                      onClick={handleDirectAccess}
+                      className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-2xl py-3.5 flex items-center justify-center gap-2 text-sm cursor-pointer transition-colors"
+                    >
+                      <span>Platformaga to‘g‘ridan-to‘g‘ri kirish (Dashboard) →</span>
                     </button>
                   </div>
                 </motion.div>
