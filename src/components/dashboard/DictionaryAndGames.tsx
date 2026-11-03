@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Volume2,
   Search,
@@ -15,6 +15,11 @@ import {
   RotateCcw,
   Sparkles,
   ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Flame,
 } from "lucide-react";
 import {
   dictionaryWords,
@@ -23,6 +28,40 @@ import {
   WordCategory,
   DictWord,
 } from "@/data/dictionaryData";
+
+// Web Audio API feedback sounds (instant, zero external audio lag)
+function playAudioFeedback(isCorrect: boolean) {
+  if (typeof window === "undefined") return;
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    if (isCorrect) {
+      // High pleasant chime
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.35);
+    } else {
+      // Low buzz
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(220, ctx.currentTime);
+      osc.frequency.linearRampToValueAtTime(150, ctx.currentTime + 0.25);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.3);
+    }
+  } catch {}
+}
 
 export const DictionaryAndGames: React.FC = () => {
   const [activeLevel, setActiveLevel] = useState<CEFRLevel>("0-Daraja (Asosiy)");
@@ -33,6 +72,10 @@ export const DictionaryAndGames: React.FC = () => {
   // LocalStorage for Mastered & Starred Words
   const [masteredIds, setMasteredIds] = useState<string[]>([]);
   const [starredIds, setStarredIds] = useState<string[]>([]);
+
+  // Pagination for 5000 Words Scalability (24 words per page)
+  const PAGE_SIZE = 24;
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -74,29 +117,51 @@ export const DictionaryAndGames: React.FC = () => {
   const speakText = useCallback((text: string, rate: number = 0.9) => {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
+      // Clean word text from any trailing metadata
+      const cleanText = text.replace(/\s*\([^)]*\)/g, "").trim();
+      const utterance = new SpeechSynthesisUtterance(cleanText);
       utterance.lang = "en-US";
       utterance.rate = rate;
       window.speechSynthesis.speak(utterance);
     }
   }, []);
 
-  // Filtered words for current level, category, and search
-  const levelFilteredWords = dictionaryWords.filter((w) => w.level === activeLevel);
-  const wordsPool = levelFilteredWords.length > 0 ? levelFilteredWords : dictionaryWords;
+  // Filtered words for current level
+  const levelFilteredWords = useMemo(
+    () => dictionaryWords.filter((w) => w.level === activeLevel),
+    [activeLevel]
+  );
 
-  const displayedWords = levelFilteredWords.filter((w) => {
-    const matchesCategory = activeCategory === "Barchasi" || w.category === activeCategory;
-    const matchesSearch =
-      w.en.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      w.uz.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  const wordsPool = useMemo(
+    () => (levelFilteredWords.length > 0 ? levelFilteredWords : dictionaryWords),
+    [levelFilteredWords]
+  );
+
+  const displayedWords = useMemo(() => {
+    return levelFilteredWords.filter((w) => {
+      const matchesCategory = activeCategory === "Barchasi" || w.category === activeCategory;
+      const matchesSearch =
+        w.en.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        w.uz.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesCategory && matchesSearch;
+    });
+  }, [levelFilteredWords, activeCategory, searchQuery]);
+
+  // Reset pagination when level, category, or search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeLevel, activeCategory, searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(displayedWords.length / PAGE_SIZE));
+  const paginatedWords = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return displayedWords.slice(start, start + PAGE_SIZE);
+  }, [displayedWords, currentPage, PAGE_SIZE]);
 
   // ---------------------------------------------------------------------------
-  // GAME 1: YES / NO MATCH (10-QUESTION ROUND LOOP WITH 800MS DELAY)
+  // GAME 1: YES / NO MATCH
   // ---------------------------------------------------------------------------
-  const [ynQuestionNum, setYnQuestionNum] = useState(1); // 1 to 10
+  const [ynQuestionNum, setYnQuestionNum] = useState(1);
   const [ynCorrectCount, setYnCorrectCount] = useState(0);
   const [ynDisplayedUz, setYnDisplayedUz] = useState("");
   const [ynIsActualMatch, setYnIsActualMatch] = useState(true);
@@ -104,23 +169,27 @@ export const DictionaryAndGames: React.FC = () => {
   const [ynIsFinished, setYnIsFinished] = useState(false);
   const [ynCurrentWord, setYnCurrentWord] = useState<DictWord | null>(null);
 
-  const setupYesNoRound = useCallback((qNum: number) => {
-    if (wordsPool.length === 0) return;
-    const current = wordsPool[(qNum - 1) % wordsPool.length];
-    setYnCurrentWord(current);
+  const setupYesNoRound = useCallback(
+    (qNum: number) => {
+      if (wordsPool.length === 0) return;
+      const current = wordsPool[(qNum - 1) % wordsPool.length];
+      setYnCurrentWord(current);
 
-    const isMatch = Math.random() > 0.5;
-    if (isMatch) {
-      setYnDisplayedUz(current.uz);
-      setYnIsActualMatch(true);
-    } else {
-      const others = wordsPool.filter((w) => w.id !== current.id);
-      const randomOther = others.length > 0 ? others[Math.floor(Math.random() * others.length)] : current;
-      setYnDisplayedUz(randomOther.uz);
-      setYnIsActualMatch(false);
-    }
-    setYnFeedback("idle");
-  }, [wordsPool]);
+      const isMatch = Math.random() > 0.5;
+      if (isMatch) {
+        setYnDisplayedUz(current.uz);
+        setYnIsActualMatch(true);
+      } else {
+        const others = wordsPool.filter((w) => w.id !== current.id);
+        const randomOther =
+          others.length > 0 ? others[Math.floor(Math.random() * others.length)] : current;
+        setYnDisplayedUz(randomOther.uz);
+        setYnIsActualMatch(false);
+      }
+      setYnFeedback("idle");
+    },
+    [wordsPool]
+  );
 
   useEffect(() => {
     if (viewMode === "gameYesNo" && !ynIsFinished) {
@@ -135,12 +204,13 @@ export const DictionaryAndGames: React.FC = () => {
     if (isCorrect) {
       setYnFeedback("correct");
       setYnCorrectCount((prev) => prev + 1);
+      playAudioFeedback(true);
       speakText(ynCurrentWord.en, 1.0);
     } else {
       setYnFeedback("wrong");
+      playAudioFeedback(false);
     }
 
-    // 800ms visual feedback delay before next question
     setTimeout(() => {
       if (ynQuestionNum >= 10) {
         setYnIsFinished(true);
@@ -148,7 +218,7 @@ export const DictionaryAndGames: React.FC = () => {
         setYnQuestionNum((prev) => prev + 1);
         setYnFeedback("idle");
       }
-    }, 800);
+    }, 1200);
   };
 
   const restartYesNoGame = () => {
@@ -160,75 +230,114 @@ export const DictionaryAndGames: React.FC = () => {
   };
 
   // ---------------------------------------------------------------------------
-  // GAME 2: 5-OPTION LISTENING QUIZ (10-QUESTION ROUND LOOP WITH 800MS DELAY)
+  // GAME 2: AUDIO QUIZ (STRICTLY 5 WORDS PER STAGE, 1500MS LOCK, RANDOMIZED)
   // ---------------------------------------------------------------------------
-  const [listenQuestionNum, setListenQuestionNum] = useState(1); // 1 to 10
-  const [listenCorrectCount, setListenCorrectCount] = useState(0);
-  const [listenOptions, setListenOptions] = useState<DictWord[]>([]);
-  const [listenSelectedId, setListenSelectedId] = useState<string | null>(null);
-  const [listenState, setListenState] = useState<"idle" | "correct" | "wrong">("idle");
-  const [listenIsFinished, setListenIsFinished] = useState(false);
+  const [quizStage, setQuizStage] = useState(1);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0); // 0 to 4
+  const [stageQuestions, setStageQuestions] = useState<
+    { target: DictWord; options: DictWord[] }[]
+  >([]);
+  const [stageCorrectCount, setStageCorrectCount] = useState(0);
+  const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
+  const [isAnswered, setIsAnswered] = useState(false);
+  const [answerResult, setAnswerResult] = useState<"idle" | "correct" | "wrong">("idle");
+  const [isStageComplete, setIsStageComplete] = useState(false);
   const [isAudioRippling, setIsAudioRippling] = useState(false);
-  const [currentListenTarget, setCurrentListenTarget] = useState<DictWord | null>(null);
 
-  const setupListeningRound = useCallback((qNum: number) => {
-    if (wordsPool.length === 0) return;
-    const target = wordsPool[(qNum - 1) % wordsPool.length];
-    setCurrentListenTarget(target);
+  // Setup a new randomized stage of strictly 5 questions
+  const startNewStage = useCallback(
+    (stageNum: number) => {
+      if (wordsPool.length < 5) return;
+      // 1. Shuffle words array completely
+      const shuffled = [...wordsPool].sort(() => Math.random() - 0.5);
+      const targets = shuffled.slice(0, 5);
 
-    const others = wordsPool.filter((w) => w.id !== target.id);
-    const shuffledOthers = [...others].sort(() => Math.random() - 0.5).slice(0, 4);
-    const all5 = [target, ...shuffledOthers].sort(() => Math.random() - 0.5);
+      const questions = targets.map((target) => {
+        const others = wordsPool.filter((w) => w.id !== target.id);
+        const shuffledOthers = [...others].sort(() => Math.random() - 0.5).slice(0, 4);
+        const options = [target, ...shuffledOthers].sort(() => Math.random() - 0.5);
+        return { target, options };
+      });
 
-    setListenOptions(all5);
-    setListenSelectedId(null);
-    setListenState("idle");
-  }, [wordsPool]);
+      setQuizStage(stageNum);
+      setStageQuestions(questions);
+      setCurrentQuestionIndex(0);
+      setStageCorrectCount(0);
+      setSelectedOptionId(null);
+      setIsAnswered(false);
+      setAnswerResult("idle");
+      setIsStageComplete(false);
 
+      // Pronounce target word
+      if (questions[0]?.target) {
+        setTimeout(() => {
+          speakText(questions[0].target.en, 0.9);
+        }, 500);
+      }
+    },
+    [wordsPool, speakText]
+  );
+
+  // Start stage when entering listening game
   useEffect(() => {
-    if (viewMode === "gameListening" && !listenIsFinished) {
-      setupListeningRound(listenQuestionNum);
+    if (viewMode === "gameListening") {
+      startNewStage(1);
     }
-  }, [viewMode, listenQuestionNum, listenIsFinished, setupListeningRound]);
+  }, [viewMode, activeLevel, startNewStage]);
+
+  const activeQuestion = stageQuestions[currentQuestionIndex] || null;
 
   const playListenAudio = () => {
-    if (!currentListenTarget) return;
+    if (!activeQuestion?.target) return;
     setIsAudioRippling(true);
-    speakText(currentListenTarget.en, 0.9);
+    speakText(activeQuestion.target.en, 0.9);
     setTimeout(() => setIsAudioRippling(false), 1200);
   };
 
-  const handleSelectListenOption = (word: DictWord) => {
-    if (listenState !== "idle" || !currentListenTarget) return;
-    setListenSelectedId(word.id);
+  // Answer handler with strict isAnswered lock and 1500ms delay
+  const handleSelectListenOption = (opt: DictWord) => {
+    if (isAnswered || answerResult !== "idle" || !activeQuestion) return;
 
-    const isCorrect = word.id === currentListenTarget.id;
+    // Immediately set isAnswered lock state to true to block all rapid clicks!
+    setIsAnswered(true);
+    setSelectedOptionId(opt.id);
+
+    const isCorrect = opt.id === activeQuestion.target.id;
+    setAnswerResult(isCorrect ? "correct" : "wrong");
+
     if (isCorrect) {
-      setListenState("correct");
-      setListenCorrectCount((c) => c + 1);
-    } else {
-      setListenState("wrong");
+      setStageCorrectCount((c) => c + 1);
     }
 
-    // 800ms visual delay before moving to next question
+    // Play feedback tone
+    playAudioFeedback(isCorrect);
+
+    // Strictly 1500ms timeout before advancing to next question
     setTimeout(() => {
-      if (listenQuestionNum >= 10) {
-        setListenIsFinished(true);
+      if (currentQuestionIndex >= 4) {
+        // Round Complete after strictly 5 questions!
+        setIsStageComplete(true);
       } else {
-        setListenQuestionNum((prev) => prev + 1);
-        setListenState("idle");
-        setListenSelectedId(null);
+        const nextIdx = currentQuestionIndex + 1;
+        setCurrentQuestionIndex(nextIdx);
+        setIsAnswered(false);
+        setSelectedOptionId(null);
+        setAnswerResult("idle");
+
+        // Automatically speak next word
+        if (stageQuestions[nextIdx]?.target) {
+          speakText(stageQuestions[nextIdx].target.en, 0.9);
+        }
       }
-    }, 900);
+    }, 1500);
   };
 
-  const restartListeningGame = () => {
-    setListenQuestionNum(1);
-    setListenCorrectCount(0);
-    setListenState("idle");
-    setListenSelectedId(null);
-    setListenIsFinished(false);
-    setupListeningRound(1);
+  const handleNextStage = () => {
+    startNewStage(quizStage + 1);
+  };
+
+  const handleRestartQuiz = () => {
+    startNewStage(1);
   };
 
   return (
@@ -246,12 +355,10 @@ export const DictionaryAndGames: React.FC = () => {
                 type="button"
                 onClick={() => {
                   setActiveLevel(lvl);
+                  setCurrentPage(1);
                   setYnQuestionNum(1);
                   setYnCorrectCount(0);
                   setYnIsFinished(false);
-                  setListenQuestionNum(1);
-                  setListenCorrectCount(0);
-                  setListenIsFinished(false);
                 }}
                 className={`px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all cursor-pointer whitespace-nowrap ${
                   isActive
@@ -260,6 +367,9 @@ export const DictionaryAndGames: React.FC = () => {
                 }`}
               >
                 {lvl}
+                <span className="ml-2 text-[10px] opacity-75 font-normal">
+                  (1,000 so‘z)
+                </span>
               </button>
             );
           })}
@@ -267,10 +377,10 @@ export const DictionaryAndGames: React.FC = () => {
       </div>
 
       {/* ============================================================= */}
-      {/* 2. SUB-MODE SELECTOR: DICTIONARY / YES-NO / LISTENING          */}
+      {/* 2. SUB-MODE SELECTOR: DICTIONARY / YES-NO / AUDIO QUIZ         */}
       {/* ============================================================= */}
       <div className="flex flex-wrap items-center justify-between gap-4 bg-white rounded-[24px] p-3 border border-stone-200/80 shadow-xs">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
             onClick={() => setViewMode("dictionary")}
@@ -281,7 +391,7 @@ export const DictionaryAndGames: React.FC = () => {
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
-            <span>Lug‘at Kartalari</span>
+            <span>Lug‘at Kartalari ({levelFilteredWords.length})</span>
           </button>
 
           <button
@@ -304,7 +414,7 @@ export const DictionaryAndGames: React.FC = () => {
             type="button"
             onClick={() => {
               setViewMode("gameListening");
-              restartListeningGame();
+              startNewStage(1);
             }}
             className={`px-4 py-2 rounded-xl font-bold text-xs transition-colors flex items-center gap-2 cursor-pointer ${
               viewMode === "gameListening"
@@ -313,59 +423,74 @@ export const DictionaryAndGames: React.FC = () => {
             }`}
           >
             <Ear className="w-3.5 h-3.5" />
-            <span>5-Variantli Audio Quiz (10 Savol)</span>
+            <span>Audio Sinov (5 Savol / Bosqich)</span>
           </button>
         </div>
 
-        <div className="text-xs font-bold text-slate-400">
-          Ushbu darajada: <span className="text-slate-900 font-black">{levelFilteredWords.length} ta so‘z</span>
+        {/* Global Progress Counters */}
+        <div className="flex items-center gap-3 text-xs font-bold text-slate-500">
+          <span className="flex items-center gap-1 text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200/80">
+            <Check className="w-3.5 h-3.5" /> {masteredIds.length} yodlandi
+          </span>
+          <span className="flex items-center gap-1 text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200/80">
+            <Star className="w-3.5 h-3.5 fill-current" /> {starredIds.length} yulduzcha
+          </span>
         </div>
       </div>
 
       {/* ============================================================= */}
-      {/* MODE 1: LUG'AT KARTALARI & QIDIRUV                            */}
+      {/* MODE 1: DICTIONARY CARDS (WITH PAGINATION FOR 1000 WORDS)     */}
       {/* ============================================================= */}
       {viewMode === "dictionary" && (
         <div className="space-y-6">
-          {/* Instant Search Bar & Category Filter Pills */}
-          <div className="bg-white rounded-[28px] p-5 border border-stone-200/80 shadow-[0_4px_25px_rgba(0,0,0,0.04)] space-y-4">
-            <div className="flex flex-col sm:flex-row items-center gap-4">
-              <div className="relative flex-1 w-full">
-                <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="So‘z yoki tarjimani qidiring (masalan: book, tajriba)..."
-                  className="w-full pl-11 pr-4 py-3 rounded-2xl bg-slate-100 focus:bg-white focus:ring-2 focus:ring-[#FACC15] text-xs sm:text-sm font-semibold text-slate-900 outline-none transition-all"
-                />
-              </div>
+          {/* Search & Category Filter Bar */}
+          <div className="bg-white rounded-[28px] p-4 sm:p-5 border border-stone-200/80 shadow-[0_4px_25px_rgba(0,0,0,0.03)] flex flex-col md:flex-row items-center justify-between gap-4">
+            {/* Search Input */}
+            <div className="relative w-full md:w-80">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Inglizcha yoki o‘zbekcha qidiruv..."
+                className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#FACC15] focus:bg-white transition-all"
+              />
+            </div>
 
-              {/* Categories */}
-              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar w-full sm:w-auto">
-                {(["Barchasi", "Fe'llar", "Otlar", "Sifatlar", "Kundalik iboralar"] as WordCategory[]).map(
-                  (cat) => (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => setActiveCategory(cat)}
-                      className={`px-3 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer whitespace-nowrap ${
-                        activeCategory === cat
-                          ? "bg-slate-900 text-white"
-                          : "bg-slate-100 text-slate-600 hover:text-slate-900"
-                      }`}
-                    >
-                      {cat}
-                    </button>
-                  )
-                )}
-              </div>
+            {/* Category Filter Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto no-scrollbar">
+              {(["Barchasi", "Fe'llar", "Otlar", "Sifatlar", "Kundalik iboralar"] as WordCategory[]).map(
+                (cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setActiveCategory(cat)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors whitespace-nowrap cursor-pointer ${
+                      activeCategory === cat
+                        ? "bg-[#FEF08A] text-yellow-950 font-black border border-yellow-300"
+                        : "bg-slate-100 text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                )
+              )}
             </div>
           </div>
 
-          {/* Word Cards Grid */}
+          {/* Pagination Top Summary */}
+          <div className="flex items-center justify-between text-xs text-slate-500 px-2 font-medium">
+            <span>
+              Jami topildi: <strong className="text-slate-900">{displayedWords.length} ta</strong> so‘z
+            </span>
+            <span>
+              Sahifa: <strong className="text-slate-900">{currentPage}</strong> / {totalPages}
+            </span>
+          </div>
+
+          {/* Word Cards Grid (24 words per page) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {displayedWords.map((w) => {
+            {paginatedWords.map((w) => {
               const isMastered = masteredIds.includes(w.id);
               const isStarred = starredIds.includes(w.id);
 
@@ -408,19 +533,13 @@ export const DictionaryAndGames: React.FC = () => {
                     <h4 className="font-serif font-black text-xl text-slate-900 leading-tight">
                       {w.en}
                     </h4>
-                    <p className="text-xs font-mono text-slate-400 mb-2">
-                      {w.ipa}
-                    </p>
-                    <p className="text-sm font-semibold text-slate-700">
-                      {w.uz}
-                    </p>
+                    <p className="text-xs font-mono text-slate-400 mb-2">{w.ipa}</p>
+                    <p className="text-sm font-semibold text-slate-700">{w.uz}</p>
                   </div>
 
                   {/* Example & Mastered Toggle */}
                   <div className="space-y-3 pt-3 border-t border-slate-100">
-                    <p className="text-xs text-slate-500 italic leading-snug">
-                      "{w.exampleEn}"
-                    </p>
+                    <p className="text-xs text-slate-500 italic leading-snug">"{w.exampleEn}"</p>
 
                     <button
                       type="button"
@@ -439,37 +558,88 @@ export const DictionaryAndGames: React.FC = () => {
               );
             })}
           </div>
+
+          {/* Pagination Controls Bar */}
+          {totalPages > 1 && (
+            <div className="bg-white rounded-[24px] p-4 border border-stone-200/80 shadow-xs flex flex-wrap items-center justify-between gap-4">
+              <div className="text-xs text-slate-500 font-medium">
+                Ko‘rsatilmoqda: {(currentPage - 1) * PAGE_SIZE + 1} -{" "}
+                {Math.min(currentPage * PAGE_SIZE, displayedWords.length)} / {displayedWords.length} ta so‘z
+              </div>
+
+              <div className="flex items-center gap-1 sm:gap-2">
+                <button
+                  type="button"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(1)}
+                  className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 text-xs transition-colors cursor-pointer"
+                  title="Birinchi sahifa"
+                >
+                  <ChevronsLeft className="w-4 h-4" />
+                </button>
+
+                <button
+                  type="button"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Oldingi</span>
+                </button>
+
+                <span className="px-3 py-1.5 bg-[#FEF08A] text-yellow-950 font-black text-xs rounded-xl">
+                  {currentPage} / {totalPages}
+                </span>
+
+                <button
+                  type="button"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <span>Keyingi</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+
+                <button
+                  type="button"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(totalPages)}
+                  className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 text-xs transition-colors cursor-pointer"
+                  title="Oxirgi sahifa"
+                >
+                  <ChevronsRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {/* ============================================================= */}
-      {/* MODE 2: YES / NO MATCH (10-QUESTION ROUND LOOP)               */}
+      {/* MODE 2: YES / NO GAME                                          */}
       {/* ============================================================= */}
       {viewMode === "gameYesNo" && (
         <div className="bg-white rounded-[32px] p-6 sm:p-10 border border-stone-200/80 shadow-[0_4px_30px_rgba(0,0,0,0.04)] max-w-2xl mx-auto flex flex-col items-center text-center space-y-6">
           {ynIsFinished ? (
-            /* Celebration Screen */
             <div className="space-y-6 py-6 w-full flex flex-col items-center">
-              <div className="w-20 h-20 rounded-full bg-[#FEF9C3] border-4 border-[#FACC15] flex items-center justify-center text-3xl shadow-lg">
-                <Trophy className="w-10 h-10 text-yellow-600" />
+              <div className="w-20 h-20 rounded-full bg-emerald-100 border-4 border-emerald-400 flex items-center justify-center text-3xl shadow-lg">
+                <Trophy className="w-10 h-10 text-emerald-600" />
               </div>
-
               <div className="space-y-2">
-                <span className="text-xs font-black uppercase text-yellow-800 bg-[#FFFBEB] px-3.5 py-1 rounded-full border border-yellow-200">
-                  Raund Yakunlandi! 🎉
+                <span className="text-xs font-black uppercase text-emerald-800 bg-emerald-50 px-3.5 py-1 rounded-full border border-emerald-200">
+                  O‘yin Yakunlandi! 🎉
                 </span>
                 <h3 className="font-serif text-3xl font-black text-slate-900">
                   Natijangiz: {ynCorrectCount} / 10
                 </h3>
                 <p className="text-sm text-slate-500 font-medium max-w-md mx-auto">
                   {ynCorrectCount >= 8
-                    ? "Fantastik natija! Siz bu darajadagi so‘zlarni deyarli mukammal o‘zlashtirdingiz."
-                    : ynCorrectCount >= 5
-                    ? "Yaxshi natija! Bir necha marta takrorlab, 10/10 natijaga erishing."
-                    : "Yomon emas! Lug‘at kartalarini qayta ko‘rib chiqib, o‘yinni yana sinab ko‘ring."}
+                    ? "Ajoyib xotira! Siz ko‘p so‘zlarni mukammal bilasiz."
+                    : "Yaxshi natija! Lug‘at kartalarini yana bir bor takrorlang."}
                 </p>
               </div>
-
               <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
                 <button
                   type="button"
@@ -477,7 +647,7 @@ export const DictionaryAndGames: React.FC = () => {
                   className="px-6 py-3 rounded-2xl bg-[#FACC15] hover:bg-[#EAB308] text-slate-950 font-black text-sm shadow-md transition-all flex items-center gap-2 cursor-pointer"
                 >
                   <RotateCcw className="w-4 h-4" />
-                  <span>Qaytadan o‘ynash</span>
+                  <span>Qayta o‘ynash</span>
                 </button>
                 <button
                   type="button"
@@ -490,9 +660,7 @@ export const DictionaryAndGames: React.FC = () => {
               </div>
             </div>
           ) : (
-            /* Active 10-Question Gameplay */
             <>
-              {/* Question Progress Header */}
               <div className="flex items-center justify-between w-full border-b border-slate-100 pb-4">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-black uppercase text-[#CA8A04] bg-[#FEF9C3] px-3 py-1 rounded-full">
@@ -509,7 +677,6 @@ export const DictionaryAndGames: React.FC = () => {
                 </div>
               </div>
 
-              {/* Progress Bar */}
               <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                 <div
                   className="bg-[#FACC15] h-full transition-all duration-300"
@@ -523,9 +690,7 @@ export const DictionaryAndGames: React.FC = () => {
                     <h3 className="font-serif text-4xl sm:text-5xl font-black text-slate-900 tracking-tight">
                       {ynCurrentWord.en}
                     </h3>
-                    <p className="text-xs font-mono text-slate-400">
-                      {ynCurrentWord.ipa}
-                    </p>
+                    <p className="text-xs font-mono text-slate-400">{ynCurrentWord.ipa}</p>
                   </div>
 
                   <div
@@ -540,9 +705,7 @@ export const DictionaryAndGames: React.FC = () => {
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
                       Mos keluvchi tarjima deb o‘ylaysizmi?
                     </p>
-                    <p className="text-2xl font-black text-slate-900">
-                      "{ynDisplayedUz}"
-                    </p>
+                    <p className="text-2xl font-black text-slate-900">"{ynDisplayedUz}"</p>
 
                     {ynFeedback === "correct" && (
                       <p className="text-xs font-black text-emerald-700 mt-2 flex items-center justify-center gap-1">
@@ -585,12 +748,12 @@ export const DictionaryAndGames: React.FC = () => {
       )}
 
       {/* ============================================================= */}
-      {/* MODE 3: 5-OPTION LISTENING QUIZ (10-QUESTION ROUND LOOP)      */}
+      {/* MODE 3: AUDIO QUIZ (STRICTLY 5 WORDS PER STAGE, 1500MS LOCK)  */}
       {/* ============================================================= */}
       {viewMode === "gameListening" && (
         <div className="bg-white rounded-[32px] p-6 sm:p-10 border border-stone-200/80 shadow-[0_4px_30px_rgba(0,0,0,0.04)] max-w-2xl mx-auto flex flex-col items-center text-center space-y-6">
-          {listenIsFinished ? (
-            /* Celebration Screen */
+          {isStageComplete ? (
+            /* Round Complete Screen with "Keyingi bosqichga o'tish" */
             <div className="space-y-6 py-6 w-full flex flex-col items-center">
               <div className="w-20 h-20 rounded-full bg-sky-100 border-4 border-sky-400 flex items-center justify-center text-3xl shadow-lg">
                 <Sparkles className="w-10 h-10 text-sky-600" />
@@ -598,61 +761,75 @@ export const DictionaryAndGames: React.FC = () => {
 
               <div className="space-y-2">
                 <span className="text-xs font-black uppercase text-sky-800 bg-sky-50 px-3.5 py-1 rounded-full border border-sky-200">
-                  Audio Sinov Yakunlandi! 🎧
+                  {quizStage}-Bosqich Yakunlandi! 🎧
                 </span>
                 <h3 className="font-serif text-3xl font-black text-slate-900">
-                  Natijangiz: {listenCorrectCount} / 10
+                  Natijangiz: 5 tadan {stageCorrectCount} ta to‘g‘ri
                 </h3>
                 <p className="text-sm text-slate-500 font-medium max-w-md mx-auto">
-                  {listenCorrectCount >= 8
-                    ? "Ajoyib eshitish idroki! Siz talaffuz qilingan so‘zlarni bir zumda aniqlay oldingiz."
-                    : "Yaxshi urinish! Quloqni inglizcha ohangga moslashtirish uchun darslarni davom ettiring."}
+                  {stageCorrectCount >= 4
+                    ? "Ajoyib eshitish idroki! Yangi tasodifiy so‘zlar bilan keyingi bosqichga o‘ting."
+                    : "Yaxshi urinish! Keyingi bosqichda eshitish diqqatingizni yanada charxlang."}
                 </p>
               </div>
 
               <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                {/* Prominent Next Stage Button */}
                 <button
                   type="button"
-                  onClick={restartListeningGame}
-                  className="px-6 py-3 rounded-2xl bg-sky-500 hover:bg-sky-600 text-white font-black text-sm shadow-md transition-all flex items-center gap-2 cursor-pointer"
+                  onClick={handleNextStage}
+                  className="px-7 py-3.5 rounded-2xl bg-[#FACC15] hover:bg-[#EAB308] text-slate-950 font-black text-sm shadow-md shadow-yellow-400/20 transition-all flex items-center gap-2 cursor-pointer scale-105"
                 >
-                  <RotateCcw className="w-4 h-4" />
-                  <span>Qaytadan boshlash</span>
+                  <Flame className="w-4 h-4 text-amber-600 fill-amber-500" />
+                  <span>Keyingi bosqichga o‘tish ({quizStage + 1}-Bosqich) →</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={handleRestartQuiz}
+                  className="px-5 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors flex items-center gap-2 cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>1-bosqichdan boshlash</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setViewMode("dictionary")}
-                  className="px-6 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm transition-colors flex items-center gap-2 cursor-pointer"
+                  className="px-5 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors flex items-center gap-2 cursor-pointer"
                 >
                   <span>Lug‘atga qaytish</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
           ) : (
-            /* Active 10-Question Gameplay */
+            /* Active 5-Word Stage Gameplay */
             <>
               <div className="flex items-center justify-between w-full border-b border-slate-100 pb-4">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-black uppercase text-[#CA8A04] bg-[#FEF9C3] px-3 py-1 rounded-full">
                     {activeLevel}
                   </span>
+                  <span className="text-xs font-black text-sky-800 bg-sky-50 px-3 py-1 rounded-full border border-sky-200">
+                    {quizStage}-Bosqich
+                  </span>
                   <span className="text-xs font-black text-slate-700 bg-slate-100 px-3 py-1 rounded-full">
-                    Savol: {listenQuestionNum} / 10
+                    Savol: {currentQuestionIndex + 1} / 5
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-xs font-black text-sky-800 bg-sky-50 px-3 py-1 rounded-full border border-sky-200">
-                    To‘g‘ri: {listenCorrectCount}
+                    To‘g‘ri: {stageCorrectCount}
                   </span>
                 </div>
               </div>
 
-              {/* Progress Bar */}
-              <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+              {/* Progress Bar (Strictly 5 questions per stage) */}
+              <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
                 <div
                   className="bg-sky-500 h-full transition-all duration-300"
-                  style={{ width: `${(listenQuestionNum / 10) * 100}%` }}
+                  style={{ width: `${((currentQuestionIndex + 1) / 5) * 100}%` }}
                 />
               </div>
 
@@ -663,51 +840,69 @@ export const DictionaryAndGames: React.FC = () => {
                 className={`w-20 h-20 rounded-full flex items-center justify-center transition-all cursor-pointer relative shadow-lg ${
                   isAudioRippling ? "bg-[#FACC15] scale-105" : "bg-sky-500 hover:bg-sky-600 text-white"
                 }`}
-                title="Audioni tinglash"
+                title="Audioni qayta tinglash"
               >
                 <Volume2 className="w-8 h-8" />
                 {isAudioRippling && (
                   <span className="absolute inset-0 rounded-full border-4 border-yellow-400 animate-ping pointer-events-none" />
                 )}
               </button>
-              <p className="text-xs font-bold text-slate-400">
-                Audioni tinglang va to‘g‘ri ma'nosini tanlang (800ms avtomatik o‘tish)
-              </p>
 
-              {/* 5 Options Stack */}
-              <div className="space-y-2.5 w-full text-left">
-                {listenOptions.map((opt) => {
-                  const isSelected = listenSelectedId === opt.id;
-                  const isCorrect = opt.id === currentListenTarget?.id;
-
-                  let style = "bg-sky-50/80 hover:bg-sky-100 text-sky-950 border-sky-200";
-
-                  if (listenState !== "idle") {
-                    if (isCorrect) {
-                      style = "bg-emerald-500 text-white border-emerald-600 scale-[1.01]";
-                    } else if (isSelected) {
-                      style = "bg-rose-500 text-white border-rose-600";
-                    } else {
-                      style = "bg-slate-100 text-slate-400 border-slate-200 opacity-50";
-                    }
-                  }
-
-                  return (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      disabled={listenState !== "idle"}
-                      onClick={() => handleSelectListenOption(opt)}
-                      className={`w-full p-3.5 rounded-2xl font-bold text-xs sm:text-sm border transition-all flex items-center justify-between cursor-pointer ${style}`}
-                    >
-                      <span>{opt.uz}</span>
-                      {listenState !== "idle" && isCorrect && (
-                        <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-                      )}
-                    </button>
-                  );
-                })}
+              <div className="space-y-1">
+                <p className="text-xs font-bold text-slate-400">
+                  Audioni tinglang va to‘g‘ri ma'nosini tanlang
+                </p>
+                {isAnswered && (
+                  <p className="text-xs font-bold text-slate-600 animate-pulse">
+                    Keyingi savolga 1.5 soniyada avtomatik o‘tilmoqda...
+                  </p>
+                )}
               </div>
+
+              {/* 5 Options Stack with strict isAnswered disabled state */}
+              {activeQuestion && (
+                <div className="space-y-2.5 w-full text-left">
+                  {activeQuestion.options.map((opt) => {
+                    const isSelected = selectedOptionId === opt.id;
+                    const isCorrect = opt.id === activeQuestion.target.id;
+
+                    let style =
+                      "bg-sky-50/80 hover:bg-sky-100 text-sky-950 border-sky-200 hover:border-sky-300";
+
+                    if (isAnswered) {
+                      if (isCorrect) {
+                        style =
+                          "bg-emerald-500 text-white border-emerald-600 scale-[1.01] shadow-md shadow-emerald-500/20";
+                      } else if (isSelected) {
+                        style =
+                          "bg-rose-500 text-white border-rose-600 shadow-md shadow-rose-500/20";
+                      } else {
+                        style = "bg-slate-100 text-slate-400 border-slate-200 opacity-40";
+                      }
+                    }
+
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        disabled={isAnswered}
+                        onClick={() => handleSelectListenOption(opt)}
+                        className={`w-full p-4 rounded-2xl font-bold text-xs sm:text-sm border transition-all flex items-center justify-between cursor-pointer ${
+                          isAnswered ? "pointer-events-none" : ""
+                        } ${style}`}
+                      >
+                        <span className="text-left leading-snug">{opt.uz}</span>
+                        {isAnswered && isCorrect && (
+                          <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-white" />
+                        )}
+                        {isAnswered && isSelected && !isCorrect && (
+                          <XCircle className="w-5 h-5 flex-shrink-0 text-white" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </>
           )}
         </div>

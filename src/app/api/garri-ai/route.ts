@@ -217,169 +217,139 @@ export async function POST(req: Request) {
     ).replace(/^["']|["']$/g, "").trim();
 
     if (apiKey && apiKey.length > 10) {
-      // Build conversation context
+      // Build short conversation context (last 3 messages)
       const formattedHistory = conversationHistory
-        .slice(-6)
-        .map((m: any) => `${m.sender === "user" ? "User" : "Garri AI"}: ${m.text || m.aiReplyEnglish || ""}`)
+        .slice(-3)
+        .map((m: any) => `${m.sender === "user" ? "User" : "AI"}: ${m.text || m.aiReplyEnglish || ""}`)
         .join("\n");
 
-      const systemInstruction = `You are Garri AI, an elite bilingual speaking coach on Talkwarts.
-The user is learning English at CEFR level: ${userLevel}.
-Lesson topic: ${lessonTopic}.
-User preferred explanation and translation language: '${langPreference.toUpperCase()}'.
-Recent conversation history:
+      // Drastically shortened system prompt for maximum speed (< 2s latency)
+      const systemInstruction = `You are Garri AI: CEFR ${userLevel} English coach. Topic: ${lessonTopic}. Lang: ${langPreference}.
+History:
 ${formattedHistory || "None"}
+Requirements:
+1. 'correctedText': Fix all grammar, spelling, and punctuation.
+2. 'explanation': Explain mistake briefly in ${langPreference === "ru" ? "Russian" : langPreference === "uz" ? "Uzbek" : "English"}.
+3. 'aiReplyEnglish': 4-8 elementary words + 1 short conversational question.
+4. 'replyTranslation': Exact ${langPreference} translation of aiReplyEnglish.
+5. 'hints': 3 short follow-ups with 'en' & 'translation'.
+6. 'scores': {grammar, fluency, vocab} (0-100).
+Respond with JSON only matching this format:
+{"correctedText":"","explanation":"","aiReplyEnglish":"","replyTranslation":"","scores":{"grammar":90,"fluency":88,"vocab":85},"hints":[{"en":"","translation":""}]}`;
 
-CRITICAL RULES:
-1. Fix ALL spelling, grammar, capitalization, and punctuation mistakes in the user's message (e.g. 'okay i understand don't you have quiestion for me' -> 'Okay, I understand. Don't you have a question for me?').
-2. Provide the mistake explanation in 'explanation':
-   - If langPreference === 'ru', write the explanation in warm, simple, encouraging Russian.
-   - If langPreference === 'uz', write the explanation in warm, simple, encouraging Uzbek.
-   - If langPreference === 'en', write the explanation in clear, simple English.
-3. PRIMARY DIALOGUE SENTENCE ('aiReplyEnglish'):
-   - Keep the main reply sentence in short, elementary 4–8 word English (very clear and friendly for beginner/elementary learners).
-   - Follow it immediately with a direct conversational question tied to the active lesson topic.
-4. TRANSLATION ('replyTranslation'):
-   - If langPreference === 'ru', provide the exact Russian translation of 'aiReplyEnglish'.
-   - If langPreference === 'uz', provide the exact Uzbek translation of 'aiReplyEnglish'.
-   - If langPreference === 'en', provide the same English sentence.
-5. Provide 3 short follow-up hints in 'hints' with 'en' and 'translation' in the user's selected language.
-6. Provide scores (0-100) for grammar, fluency, and vocab.
+      // Strictly use gemini-1.5-flash with a strict 5000ms AbortController timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-Return ONLY a valid JSON object matching this schema without markdown fences:
-{
-  "correctedText": "string",
-  "explanation": "string",
-  "aiReplyEnglish": "string (4-8 elementary words + question)",
-  "replyTranslation": "string",
-  "scores": {
-    "grammar": 90,
-    "fluency": 85,
-    "vocab": 88
-  },
-  "hints": [
-    { "en": "string", "translation": "string" },
-    { "en": "string", "translation": "string" },
-    { "en": "string", "translation": "string" }
-  ]
-}`;
-
-      // Models to try in order
-      const modelsToTry = [
-        "gemini-3.8-flash",
-        "gemini-flash-latest",
-        "gemini-2.5-flash",
-        "gemini-3.1-flash-lite",
-      ];
-
-      for (const model of modelsToTry) {
-        try {
-          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-          const res = await fetch(geminiUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    {
-                      text: `${systemInstruction}\n\nUser Message: "${userMessage}"`,
-                    },
-                  ],
-                },
-              ],
-              generationConfig: {
-                responseMimeType: "application/json",
-                temperature: 0.65,
+      try {
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+        const res = await fetch(geminiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: `${systemInstruction}\nUser Message: "${userMessage}"`,
+                  },
+                ],
               },
-            }),
-          });
+            ],
+            generationConfig: {
+              responseMimeType: "application/json",
+              temperature: 0.6,
+              maxOutputTokens: 600,
+            },
+          }),
+        });
 
-          if (res.ok) {
-            const data = await res.json();
-            const rawResponseText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        clearTimeout(timeoutId);
 
-            if (rawResponseText) {
-              const cleanedText = rawResponseText.trim().replace(/^```json\s*|\s*```$/g, "");
-              const parsed = JSON.parse(cleanedText);
+        if (res.ok) {
+          const data = await res.json();
+          const rawResponseText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
-              const explanation =
-                parsed.explanation ||
-                parsed.uzbekExplanation ||
-                (langPreference === "ru" ? "Отличный ответ!" : "Ajoyib natija!");
+          if (rawResponseText) {
+            const cleanedText = rawResponseText.trim().replace(/^```json\s*|\s*```$/g, "");
+            const parsed = JSON.parse(cleanedText);
 
-              const replyTranslation =
-                parsed.replyTranslation ||
-                parsed.aiReplyUzbek ||
-                "";
+            const explanation =
+              parsed.explanation ||
+              parsed.uzbekExplanation ||
+              (langPreference === "ru" ? "Отличный ответ!" : "Ajoyib natija!");
 
-              const hints: GarriAIHint[] = Array.isArray(parsed.hints) && parsed.hints.length > 0
-                ? parsed.hints.map((h: any) => ({
-                    en: h.en || "",
-                    translation: h.translation || h.uz || h.ru || "",
-                    uz: h.uz || h.translation || "",
-                    ru: h.ru || h.translation || "",
-                  }))
-                : [
-                    {
-                      en: "I understand clearly.",
-                      translation: langPreference === "ru" ? "Я всё понял." : "Men aniq tushundim.",
-                    },
-                    {
-                      en: "Can we practice more?",
-                      translation: langPreference === "ru" ? "Можем попрактиковаться ещё?" : "Yana mashq qilamizmi?",
-                    },
-                    {
-                      en: "Let's move forward.",
-                      translation: langPreference === "ru" ? "Давайте продолжим." : "Davom etaylik.",
-                    },
-                  ];
+            const replyTranslation =
+              parsed.replyTranslation ||
+              parsed.aiReplyUzbek ||
+              "";
 
-              const result: GarriAIResponse = {
-                correctedText: parsed.correctedText || userMessage,
-                explanation,
-                uzbekExplanation: explanation,
-                aiReplyEnglish: parsed.aiReplyEnglish || "Great job! Let's continue speaking.",
-                replyTranslation,
-                aiReplyUzbek: replyTranslation,
-                scores: {
-                  grammar: Number(parsed.scores?.grammar) || 90,
-                  fluency: Number(parsed.scores?.fluency) || 88,
-                  vocab: Number(parsed.scores?.vocab) || 85,
-                },
-                hints,
-                langPreference,
-                // Compatibility aliases
-                reply: parsed.aiReplyEnglish,
-                replyUz: replyTranslation,
-                analysis: {
-                  hasError: (parsed.correctedText || userMessage).trim() !== userMessage.trim(),
-                  userSaid: userMessage,
-                  betterWay: parsed.correctedText || userMessage,
-                  explanationUz: explanation,
-                  grammarScore: Number(parsed.scores?.grammar) || 90,
-                  vocabularyScore: Number(parsed.scores?.vocab) || 85,
-                  fluencyScore: Number(parsed.scores?.fluency) || 88,
-                },
-              };
+            const hints: GarriAIHint[] = Array.isArray(parsed.hints) && parsed.hints.length > 0
+              ? parsed.hints.map((h: any) => ({
+                  en: h.en || "",
+                  translation: h.translation || h.uz || h.ru || "",
+                  uz: h.uz || h.translation || "",
+                  ru: h.ru || h.translation || "",
+                }))
+              : [
+                  {
+                    en: "I understand clearly.",
+                    translation: langPreference === "ru" ? "Я всё понял." : "Men aniq tushundim.",
+                  },
+                  {
+                    en: "Can we practice more?",
+                    translation: langPreference === "ru" ? "Можем попрактиковаться ещё?" : "Yana mashq qilamizmi?",
+                  },
+                  {
+                    en: "Let's move forward.",
+                    translation: langPreference === "ru" ? "Давайте продолжим." : "Davom etaylik.",
+                  },
+                ];
 
-              return NextResponse.json(result);
-            }
+            const result: GarriAIResponse = {
+              correctedText: parsed.correctedText || userMessage,
+              explanation,
+              uzbekExplanation: explanation,
+              aiReplyEnglish: parsed.aiReplyEnglish || "Great job! Let's continue speaking.",
+              replyTranslation,
+              aiReplyUzbek: replyTranslation,
+              scores: {
+                grammar: Number(parsed.scores?.grammar) || 90,
+                fluency: Number(parsed.scores?.fluency) || 88,
+                vocab: Number(parsed.scores?.vocab) || 85,
+              },
+              hints,
+              langPreference,
+              reply: parsed.aiReplyEnglish,
+              replyUz: replyTranslation,
+              analysis: {
+                hasError: (parsed.correctedText || userMessage).trim() !== userMessage.trim(),
+                userSaid: userMessage,
+                betterWay: parsed.correctedText || userMessage,
+                explanationUz: explanation,
+                grammarScore: Number(parsed.scores?.grammar) || 90,
+                vocabularyScore: Number(parsed.scores?.vocab) || 85,
+                fluencyScore: Number(parsed.scores?.fluency) || 88,
+              },
+            };
+
+            return NextResponse.json(result);
           }
-        } catch (callErr) {
-          console.warn(`Gemini model ${model} call error:`, callErr);
         }
+      } catch (callErr: any) {
+        clearTimeout(timeoutId);
+        console.warn("Gemini 1.5 Flash call aborted or failed within 5s, returning instant smart fallback:", callErr?.message);
       }
     }
 
-    // Fallback if key missing or external model is unreachable
+    // Instant fallback if key is missing, call timed out, or quota exceeded
     const fallback = generateSmartFallback(userMessage, userLevel, lessonTopic, langPreference);
     return NextResponse.json(fallback);
   } catch (error: any) {
     console.error("Garri AI API Route Error:", error);
-    return NextResponse.json(
-      { error: "Garri AI xizmatida kutilmagan xatolik yuz berdi." },
-      { status: 500 }
-    );
+    // Even on server-level error, return smart fallback instead of 500
+    const fallback = generateSmartFallback("Hello", "B1", "General Speaking", "uz");
+    return NextResponse.json(fallback);
   }
 }
