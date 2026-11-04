@@ -102,20 +102,20 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
       {/* 4 Top Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
-        {/* Metric 1: Streak */}
+        {/* Metric 1: Daily Target */}
         <div className="bg-white rounded-[28px] p-6 border border-stone-200/80 shadow-[0_4px_25px_rgba(0,0,0,0.04)] flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-[#FFFBEB] flex items-center justify-center text-3xl flex-shrink-0 shadow-inner">
-            🔥
+            🎯
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-2xl font-black text-slate-900">7 Kun</span>
+              <span className="text-2xl font-black text-slate-900">20 daqiqa</span>
               <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
-                Faol
+                Kunlik
               </span>
             </div>
             <p className="text-xs font-semibold text-slate-400 mt-0.5">
-              Uzluksiz kunlik odat
+              Rejalashtirilgan mashg‘ulot
             </p>
           </div>
         </div>

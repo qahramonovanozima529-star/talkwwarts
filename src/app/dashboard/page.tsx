@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, Variants } from "framer-motion";
 import Link from "next/link";
 import {
   Home,
@@ -22,8 +22,6 @@ import {
   BookOpen,
   ChevronDown,
   HelpCircle,
-  Clock,
-  Flame,
 } from "lucide-react";
 
 import {
@@ -37,6 +35,28 @@ import { GarriAIChat } from "@/components/dashboard/GarriAIChat";
 import { AnalyticsDashboard } from "@/components/dashboard/AnalyticsDashboard";
 
 type MainNavTab = "home" | "curriculum" | "dictionary" | "garri" | "analytics";
+
+const mentorContainerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.2,
+    },
+  },
+};
+
+const mentorItemVariants: Variants = {
+  hidden: { opacity: 0, y: 15 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.5,
+      ease: "easeOut",
+    },
+  },
+};
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<MainNavTab>("home");
@@ -297,7 +317,7 @@ export default function DashboardPage() {
       {/* ============================================================= */}
       {/* 2. MAIN WORKSPACE CONTAINER                                   */}
       {/* ============================================================= */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-8 py-8 space-y-12">
         
         {/* =========================================================== */}
         {/* CONDITIONAL HERO BANNER (RENDERS ONLY ON ASOSIY TAB!)       */}
@@ -392,7 +412,7 @@ export default function DashboardPage() {
         <div className="min-h-[500px]">
           <AnimatePresence mode="wait">
             
-            {/* TAB 1: ASOSIY (DASHBOARD) - EXPANDED 2-COLUMN LAYOUT */}
+            {/* TAB 1: ASOSIY (DASHBOARD) - SPACIOUS CENTERED LAYOUT */}
             {activeTab === "home" && (
               <motion.div
                 key="tab-home"
@@ -400,405 +420,377 @@ export default function DashboardPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -12 }}
                 transition={{ duration: 0.3 }}
-                className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start"
+                className="space-y-12"
               >
-                {/* 1. FIXED/STICKY LEFT COLUMN: TEACHER PROFILE & STUDENT STATS */}
-                <aside className="lg:col-span-4 space-y-6 lg:sticky lg:top-24">
-                  {/* TEACHER PROFILE CARD */}
-                  <div className="bg-white rounded-[32px] p-6 border border-stone-200/80 shadow-[0_4px_25px_rgba(0,0,0,0.04)] space-y-5">
-                    {/* Header Banner & Avatar */}
-                    <div className="relative">
-                      <div className="w-full h-28 rounded-[22px] bg-gradient-to-r from-amber-400 to-[#FACC15] overflow-hidden relative shadow-inner">
-                        <div className="absolute inset-0 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:14px_14px] opacity-30" />
-                      </div>
-                      <div className="relative -mt-12 px-3 flex items-end justify-between">
-                        <div className="relative">
-                          <img
-                            src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400"
-                            alt="Teacher Javohirbek"
-                            className="w-20 h-20 rounded-2xl object-cover border-4 border-white shadow-md bg-white"
-                          />
-                          <span
-                            className="absolute bottom-1 right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white"
-                            title="Jonli aloqa tizimi faol"
-                          />
-                        </div>
-                        <span className="text-[10px] font-black uppercase text-yellow-900 bg-[#FEF08A] px-3 py-1 rounded-full border border-yellow-300">
-                          Bosh Murabbiy
-                        </span>
+                {/* 1. CENTERED EXPLAINER VIDEO SECTION */}
+                <section className="max-w-4xl mx-auto w-full bg-white rounded-2xl p-6 sm:p-8 border border-stone-200/80 shadow-md space-y-5">
+                  <div className="text-center space-y-2">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-900 text-xs font-black border border-amber-200/80">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Video Yo‘riqnoma</span>
+                    </div>
+                    <h2 className="font-serif text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                      Platformadan qanday foydalanish kerak?
+                    </h2>
+                    <p className="text-xs sm:text-sm text-slate-500 font-medium max-w-xl mx-auto">
+                      Talkwarts platformasi imkoniyatlari, 5000 ta so‘zlik lug‘at, darslar ketma-ketligi va Garri AI bilan suhbatlashish bo‘yicha to‘liq video yo‘riqnoma.
+                    </p>
+                  </div>
+
+                  {/* 16:9 Responsive Video Player with Native Controls */}
+                  <div className="relative aspect-video w-full rounded-2xl overflow-hidden shadow-md bg-slate-950 border border-stone-200">
+                    <video
+                      controls
+                      playsInline
+                      className="w-full h-full object-cover"
+                      src="/video_1.mp4"
+                    >
+                      Brauzeringiz ushbu videoni qo‘llab-quvvatlamaydi.
+                    </video>
+                  </div>
+
+                  {/* 3 Step Highlights */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                    <div className="bg-[#FFFDF9] border border-stone-200/80 rounded-xl p-3 flex items-center gap-3">
+                      <span className="w-7 h-7 rounded-lg bg-[#FEF08A] text-yellow-950 font-black text-xs flex items-center justify-center flex-shrink-0">
+                        1
+                      </span>
+                      <div>
+                        <p className="text-xs font-bold text-slate-900">Kunlik Dars</p>
+                        <p className="text-[11px] text-slate-500">6 modul, 35 ta amaliy darslik</p>
                       </div>
                     </div>
 
-                    {/* Teacher Details */}
-                    <div className="space-y-1.5">
-                      <h3 className="font-serif font-black text-xl text-slate-900 leading-snug">
-                        Ustoz Javohirbek & Garri AI
+                    <div className="bg-[#FFFDF9] border border-stone-200/80 rounded-xl p-3 flex items-center gap-3">
+                      <span className="w-7 h-7 rounded-lg bg-sky-100 text-sky-900 font-black text-xs flex items-center justify-center flex-shrink-0">
+                        2
+                      </span>
+                      <div>
+                        <p className="text-xs font-bold text-slate-900">Audio Sinov</p>
+                        <p className="text-[11px] text-slate-500">5000 so‘z, 5 talik bosqichlar</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-[#FFFDF9] border border-stone-200/80 rounded-xl p-3 flex items-center gap-3">
+                      <span className="w-7 h-7 rounded-lg bg-purple-100 text-purple-900 font-black text-xs flex items-center justify-center flex-shrink-0">
+                        3
+                      </span>
+                      <div>
+                        <p className="text-xs font-bold text-slate-900">Garri AI Suhbat</p>
+                        <p className="text-[11px] text-slate-500">Jonli nutq va real tahlil</p>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                {/* 2. MENTOR PROFILE (Left 4 cols /teacher.jpg, Right 8 cols IELTS 8.0 Bio + Framer Motion staggerChildren: 0.2) */}
+                <section className="max-w-4xl mx-auto w-full grid grid-cols-1 md:grid-cols-12 gap-8 items-center bg-white p-8 rounded-2xl shadow-sm border border-stone-200/80">
+                  {/* Left Side: 4 Columns (Teacher Image) */}
+                  <div className="md:col-span-4">
+                    <div className="relative aspect-square md:aspect-[4/5] w-full rounded-2xl overflow-hidden shadow-md bg-stone-100 border border-stone-200 group">
+                      <img
+                        src="/teacher.jpg"
+                        alt="Jasur Kobilov"
+                        className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                        onError={(e) => {
+                          e.currentTarget.src =
+                            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=800";
+                        }}
+                      />
+                      <div className="absolute bottom-3 left-3 bg-white/95 backdrop-blur-xs px-3 py-1 rounded-xl text-xs font-bold text-slate-800 shadow-sm flex items-center gap-1.5 border border-stone-200/60">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <span>Onlayn Murabbiy</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Side: 8 Columns (IELTS 8.0 Bio + Framer Motion Animation) */}
+                  <motion.div
+                    variants={mentorContainerVariants}
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true }}
+                    className="md:col-span-8 space-y-4 text-center md:text-left"
+                  >
+                    <motion.div variants={mentorItemVariants}>
+                      <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-50 text-amber-900 text-xs font-black border border-amber-200/80 shadow-2xs">
+                        ⭐ IELTS 8.0 Holder & Speaking Expert
+                      </span>
+                    </motion.div>
+
+                    <motion.div variants={mentorItemVariants} className="space-y-1">
+                      <h3 className="font-serif font-black text-2xl sm:text-3xl text-slate-900 tracking-tight">
+                        Jasur Kobilov
                       </h3>
-                      <p className="text-xs font-bold text-[#CA8A04]">
-                        Senior Academic Mentor & IELTS Coach (8.5)
+                      <p className="text-xs sm:text-sm font-bold text-[#CA8A04]">
+                        Bosh Akademik Murabbiy & AI Nutq Metodisti
                       </p>
-                      <p className="text-xs text-slate-500 font-medium leading-relaxed pt-1">
-                        10+ yillik xalqaro til o‘qitish tajribasi. Talkwarts platformasida AI orqali erkin va ravon muloqot ko‘nikmalarini shakllantirish bo‘yicha bosh metodist.
-                      </p>
-                    </div>
+                    </motion.div>
 
-                    {/* Metrics Badges */}
-                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-center">
-                      <div className="bg-[#FAFAF9] rounded-xl p-2.5">
-                        <span className="text-sm font-black text-slate-900 block">8.5</span>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase">IELTS</span>
-                      </div>
-                      <div className="bg-[#FAFAF9] rounded-xl p-2.5">
-                        <span className="text-sm font-black text-slate-900 block">10+ Yil</span>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase">Tajriba</span>
-                      </div>
-                      <div className="bg-[#FAFAF9] rounded-xl p-2.5">
-                        <span className="text-sm font-black text-slate-900 block">2,400+</span>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase">Talabalar</span>
-                      </div>
-                    </div>
+                    <motion.p
+                      variants={mentorItemVariants}
+                      className="text-xs sm:text-sm text-slate-600 leading-relaxed font-medium"
+                    >
+                      10+ yillik xalqaro til o‘qitish va IELTS Speaking tayyorlash tajribasi. 3,000 dan ortiq talabalarga 7.0+ ball olishda ko‘maklashgan. Talkwarts platformasida nutq to‘siqlarini yengish, ravon so‘zlashish va amaliy lug‘atni kontekst orqali rivojlantirish metodikasi muallifi.
+                    </motion.p>
 
-                    {/* Office Hours & Consultation */}
-                    <div className="space-y-3 pt-2 border-t border-slate-100">
-                      <div className="flex items-center gap-2 text-xs font-medium text-slate-700 bg-amber-50/70 p-2.5 rounded-xl border border-amber-200/60">
-                        <Clock className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                        <span>Konsultatsiya: Dushanba 19:00</span>
+                    <motion.div
+                      variants={mentorItemVariants}
+                      className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2"
+                    >
+                      <div className="bg-[#FFFDF9] border border-stone-200/80 rounded-xl p-3 text-center md:text-left">
+                        <span className="text-lg font-black text-slate-900 block">IELTS 8.0</span>
+                        <span className="text-[11px] font-bold text-slate-400">Speaking 8.5</span>
                       </div>
+                      <div className="bg-[#FFFDF9] border border-stone-200/80 rounded-xl p-3 text-center md:text-left">
+                        <span className="text-lg font-black text-slate-900 block">10+ Yil</span>
+                        <span className="text-[11px] font-bold text-slate-400">O‘qitish Tajribasi</span>
+                      </div>
+                      <div className="bg-[#FFFDF9] border border-stone-200/80 rounded-xl p-3 text-center md:text-left col-span-2 sm:col-span-1">
+                        <span className="text-lg font-black text-slate-900 block">Metodika</span>
+                        <span className="text-[11px] font-bold text-slate-400">AI Immersiv Nutq</span>
+                      </div>
+                    </motion.div>
 
+                    <motion.div
+                      variants={mentorItemVariants}
+                      className="pt-2 flex flex-wrap items-center justify-center md:justify-start gap-3"
+                    >
                       <button
                         type="button"
                         onClick={() => setActiveTab("garri")}
-                        className="w-full py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                        className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors flex items-center gap-2 cursor-pointer shadow-xs"
                       >
                         <MessageSquare className="w-3.5 h-3.5" />
-                        <span>AI Murabbiy bilan gaplashish</span>
+                        <span>Garri AI bilan gaplashish</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("curriculum")}
+                        className="px-5 py-2.5 rounded-xl bg-[#FACC15] hover:bg-[#EAB308] text-slate-950 font-black text-xs transition-colors flex items-center gap-2 cursor-pointer shadow-xs"
+                      >
+                        <PlayCircle className="w-3.5 h-3.5" />
+                        <span>O‘quv dasturiga o‘tish</span>
+                      </button>
+                    </motion.div>
+                  </motion.div>
+                </section>
+
+                {/* 3. 3 OVERVIEW QUICK CARDS */}
+                <div className="max-w-4xl mx-auto w-full grid grid-cols-1 md:grid-cols-3 gap-5">
+                  {/* Card 1: Navbatdagi Dars */}
+                  <div className="bg-white rounded-2xl p-5 border border-stone-200/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between space-y-4">
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-[10px] font-black uppercase text-[#CA8A04] bg-[#FEF9C3] px-2.5 py-0.5 rounded-full">
+                          Navbatdagi Dars
+                        </span>
+                        <PlayCircle className="w-5 h-5 text-[#CA8A04]" />
+                      </div>
+                      <h4 className="font-serif font-black text-base text-slate-900 leading-snug">
+                        #{nextLessonToStudy.id}. {nextLessonToStudy.titleUz}
+                      </h4>
+                      <p className="text-xs text-slate-400 italic mt-0.5 line-clamp-1">
+                        {nextLessonToStudy.titleEn}
+                      </p>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-400">
+                        {nextLessonToStudy.duration}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setActiveLesson(nextLessonToStudy)}
+                        className="px-3 py-1.5 rounded-xl bg-[#FACC15] hover:bg-[#EAB308] text-slate-950 font-black text-xs transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                      >
+                        <span>Boshlash</span>
+                        <ArrowRight className="w-3 h-3" />
                       </button>
                     </div>
                   </div>
 
-                  {/* STUDENT TARGET & STREAK SUMMARY */}
-                  <div className="bg-white rounded-[28px] p-5 border border-stone-200/80 shadow-[0_4px_20px_rgba(0,0,0,0.02)] space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black uppercase text-slate-400">
-                        Sizning Rejangiz
-                      </span>
-                      <span className="text-xs font-black text-amber-600 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 flex items-center gap-1">
-                        <Flame className="w-3 h-3 fill-amber-500" /> 7 Kunlik Streak
-                      </span>
-                    </div>
-
+                  {/* Card 2: Umumiy O'quv Statistikasi */}
+                  <div className="bg-white rounded-2xl p-5 border border-stone-200/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between space-y-4">
                     <div>
-                      <h4 className="font-serif font-black text-base text-slate-900">
-                        {profile.faculty}
-                      </h4>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Kunlik vaqt: {profile.dailyTime} • Daraja: {profile.level}
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-[10px] font-black uppercase text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full">
+                          O‘quv Xaritasi
+                        </span>
+                        <BookOpen className="w-5 h-5 text-blue-500" />
+                      </div>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-2xl font-black text-slate-900">
+                          {currentCompletedCount}
+                        </span>
+                        <span className="text-slate-400 font-bold text-xs">
+                          / 35 dars yakunlandi
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Dasturning {currentProgressPercent}% qismi tayyor.
                       </p>
                     </div>
 
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between text-[11px] font-bold text-slate-500">
-                        <span>O‘quv kursi davomiyligi</span>
-                        <span>{currentProgressPercent}%</span>
-                      </div>
+                    <div className="space-y-1.5 pt-3 border-t border-slate-100">
                       <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                         <div
                           className="bg-[#FACC15] h-full transition-all duration-300"
                           style={{ width: `${currentProgressPercent}%` }}
                         />
                       </div>
-                    </div>
-                  </div>
-                </aside>
-
-                {/* 2. MAIN DASHBOARD AREA: VIDEO, QUICK CARDS, FAQ, ROADMAP */}
-                <div className="lg:col-span-8 space-y-8">
-                  {/* EXPLAINER VIDEO SECTION */}
-                  <div className="bg-white rounded-[32px] p-6 sm:p-8 border border-stone-200/80 shadow-[0_4px_25px_rgba(0,0,0,0.04)] space-y-5">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div>
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-900 text-xs font-black border border-amber-200 mb-2">
-                          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                          <span>Video Yo‘riqnoma</span>
-                        </div>
-                        <h3 className="font-serif text-2xl font-black text-slate-900 tracking-tight">
-                          Platformadan qanday foydalanish kerak?
-                        </h3>
-                        <p className="text-xs sm:text-sm text-slate-500 font-medium">
-                          Talkwarts imkoniyatlari, 5000 ta so‘zlik lug‘at va Garri AI bilan suhbatlashish bo‘yicha 2 daqiqalik to‘liq video yo‘riqnoma.
-                        </p>
-                      </div>
-                      <span className="text-xs font-bold px-3 py-1 bg-slate-100 text-slate-600 rounded-full self-start sm:self-auto whitespace-nowrap">
-                        02:45 min
-                      </span>
-                    </div>
-
-                    {/* Responsive Explainer Video Container */}
-                    <div className="relative aspect-video rounded-[24px] overflow-hidden bg-slate-950 border border-slate-200 shadow-md flex items-center justify-center">
-                      <video
-                        controls
-                        playsInline
-                        poster="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&q=80&w=1200"
-                        className="w-full h-full object-cover"
-                      >
-                        <source
-                          src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
-                          type="video/mp4"
-                        />
-                        Brauzeringiz videoni qo‘llab-quvvatlamaydi.
-                      </video>
-                    </div>
-
-                    {/* 3 Step Highlights */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                      <div className="bg-[#FFFDF9] border border-stone-200/80 rounded-2xl p-3 flex items-center gap-3">
-                        <span className="w-7 h-7 rounded-xl bg-[#FEF08A] text-yellow-950 font-black text-xs flex items-center justify-center flex-shrink-0">
-                          1
-                        </span>
-                        <div>
-                          <p className="text-xs font-bold text-slate-900">Kunlik Dars</p>
-                          <p className="text-[11px] text-slate-500">20 ta bosqichli amaliy mavzular</p>
-                        </div>
-                      </div>
-
-                      <div className="bg-[#FFFDF9] border border-stone-200/80 rounded-2xl p-3 flex items-center gap-3">
-                        <span className="w-7 h-7 rounded-xl bg-sky-100 text-sky-900 font-black text-xs flex items-center justify-center flex-shrink-0">
-                          2
-                        </span>
-                        <div>
-                          <p className="text-xs font-bold text-slate-900">Audio Sinov</p>
-                          <p className="text-[11px] text-slate-500">5000 so‘z va 5 savolli bosqichlar</p>
-                        </div>
-                      </div>
-
-                      <div className="bg-[#FFFDF9] border border-stone-200/80 rounded-2xl p-3 flex items-center gap-3">
-                        <span className="w-7 h-7 rounded-xl bg-purple-100 text-purple-900 font-black text-xs flex items-center justify-center flex-shrink-0">
-                          3
-                        </span>
-                        <div>
-                          <p className="text-xs font-bold text-slate-900">Garri AI Suhbat</p>
-                          <p className="text-[11px] text-slate-500">Jonli ovozli tahlil & maslahatlar</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 3 Overview Quick Action Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                    {/* Card 1: Navbatdagi Dars */}
-                    <div className="bg-white rounded-[28px] p-5 border border-stone-200/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between space-y-4">
-                      <div>
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-[10px] font-black uppercase text-[#CA8A04] bg-[#FEF9C3] px-2.5 py-0.5 rounded-full">
-                            Navbatdagi Dars
-                          </span>
-                          <PlayCircle className="w-5 h-5 text-[#CA8A04]" />
-                        </div>
-                        <h4 className="font-serif font-black text-base text-slate-900 leading-snug">
-                          #{nextLessonToStudy.id}. {nextLessonToStudy.titleUz}
-                        </h4>
-                        <p className="text-xs text-slate-400 italic mt-0.5 line-clamp-1">
-                          {nextLessonToStudy.titleEn}
-                        </p>
-                      </div>
-
-                      <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-400">
-                          {nextLessonToStudy.duration}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setActiveLesson(nextLessonToStudy)}
-                          className="px-3 py-1.5 rounded-xl bg-[#FACC15] hover:bg-[#EAB308] text-slate-950 font-black text-xs transition-colors cursor-pointer flex items-center gap-1"
-                        >
-                          <span>Boshlash</span>
-                          <ArrowRight className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Card 2: Umumiy O'quv Statistikasi */}
-                    <div className="bg-white rounded-[28px] p-5 border border-stone-200/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between space-y-4">
-                      <div>
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-[10px] font-black uppercase text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full">
-                            O‘quv Xaritasi
-                          </span>
-                          <BookOpen className="w-5 h-5 text-blue-500" />
-                        </div>
-                        <div className="flex items-baseline gap-1.5">
-                          <span className="text-2xl font-black text-slate-900">
-                            {currentCompletedCount}
-                          </span>
-                          <span className="text-slate-400 font-bold text-xs">
-                            / 35 dars yakunlandi
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-500 mt-1">
-                          Dasturning {currentProgressPercent}% qismi tayyor.
-                        </p>
-                      </div>
-
-                      <div className="space-y-1.5 pt-3 border-t border-slate-100">
-                        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                          <div
-                            className="bg-[#FACC15] h-full transition-all duration-300"
-                            style={{ width: `${currentProgressPercent}%` }}
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setActiveTab("curriculum")}
-                          className="text-xs font-bold text-slate-700 hover:text-slate-900 transition-colors flex items-center gap-1"
-                        >
-                          <span>To‘liq reja</span>
-                          <ArrowRight className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Card 3: Garri AI Jonli Murabbiy */}
-                    <div className="bg-white rounded-[28px] p-5 border border-stone-200/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between space-y-4">
-                      <div>
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-[10px] font-black uppercase text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-full">
-                            Jonli Nutq
-                          </span>
-                          <Zap className="w-5 h-5 text-purple-500" />
-                        </div>
-                        <h4 className="font-serif font-black text-base text-slate-900 leading-snug">
-                          Garri AI bilan suhbat
-                        </h4>
-                        <p className="text-xs text-slate-500 mt-1">
-                          Ovozli nutq qabul qilish va xatolarni tahlil qilish.
-                        </p>
-                      </div>
-
-                      <div className="pt-3 border-t border-slate-100">
-                        <button
-                          type="button"
-                          onClick={() => setActiveTab("garri")}
-                          className="w-full py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                        >
-                          <MessageSquare className="w-3.5 h-3.5" />
-                          <span>Suhbatni boshlash</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* FAQ ACCORDION SECTION */}
-                  <div className="bg-white rounded-[32px] p-6 sm:p-8 border border-stone-200/80 shadow-[0_4px_25px_rgba(0,0,0,0.04)] space-y-5">
-                    <div>
-                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-800 text-xs font-black mb-2">
-                        <HelpCircle className="w-3.5 h-3.5 text-slate-600" />
-                        <span>Yordam va Javoblar</span>
-                      </div>
-                      <h3 className="font-serif text-2xl font-black text-slate-900 tracking-tight">
-                        Ko‘p beriladigan savollar (FAQ)
-                      </h3>
-                      <p className="text-xs sm:text-sm text-slate-500 font-medium">
-                        Platformadan foydalanish, darslar ketma-ketligi va Garri AI bo‘yicha muhim savollarga javoblar.
-                      </p>
-                    </div>
-
-                    <div className="space-y-3">
-                      {faqData.map((faq, idx) => {
-                        const isOpen = openFaqIndex === idx;
-                        return (
-                          <div
-                            key={idx}
-                            className="border border-stone-200/80 rounded-2xl overflow-hidden transition-all bg-[#FFFDF9]"
-                          >
-                            <button
-                              type="button"
-                              onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
-                              className="w-full p-4 sm:p-5 text-left flex items-center justify-between gap-4 cursor-pointer hover:bg-amber-50/40 transition-colors"
-                            >
-                              <span className="font-bold text-xs sm:text-sm text-slate-900 leading-snug">
-                                {faq.q}
-                              </span>
-                              <ChevronDown
-                                className={`w-4 h-4 text-slate-500 flex-shrink-0 transition-transform duration-200 ${
-                                  isOpen ? "rotate-180 text-yellow-600" : ""
-                                }`}
-                              />
-                            </button>
-
-                            {isOpen && (
-                              <div className="px-4 pb-4 sm:px-5 sm:pb-5 pt-0 text-xs sm:text-sm text-slate-600 font-medium leading-relaxed border-t border-slate-100/80">
-                                {faq.a}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* 6 Modules Quick Roadmap Preview */}
-                  <div className="bg-white rounded-[32px] p-6 sm:p-8 border border-stone-200/80 shadow-[0_4px_25px_rgba(0,0,0,0.04)] space-y-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-serif text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                          Bosqichlar Ketma-ketligi
-                        </h3>
-                        <p className="text-xs sm:text-sm text-slate-500 font-medium">
-                          Har bir modul yakunida Garri AI bilan imtihon suhbati o‘tkaziladi.
-                        </p>
-                      </div>
                       <button
                         type="button"
                         onClick={() => setActiveTab("curriculum")}
-                        className="text-xs font-bold text-yellow-900 bg-[#FFFBEB] hover:bg-[#FEF08A] px-4 py-2 rounded-xl border border-yellow-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+                        className="text-xs font-bold text-slate-700 hover:text-slate-900 transition-colors flex items-center gap-1"
                       >
-                        <span>Barcha darslar</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
+                        <span>To‘liq reja</span>
+                        <ArrowRight className="w-3 h-3" />
                       </button>
                     </div>
+                  </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {curriculumModulesMeta.map((mod) => {
-                        const modLessons = curriculumLessons.filter((l) => l.moduleId === mod.id);
-                        const modCompleted = modLessons.filter((l) =>
-                          completedLessonIds.includes(l.id)
-                        ).length;
-                        const isModDone = modCompleted === modLessons.length;
+                  {/* Card 3: Garri AI Jonli Murabbiy */}
+                  <div className="bg-white rounded-2xl p-5 border border-stone-200/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between space-y-4">
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-[10px] font-black uppercase text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-full">
+                          Jonli Nutq
+                        </span>
+                        <Zap className="w-5 h-5 text-purple-500" />
+                      </div>
+                      <h4 className="font-serif font-black text-base text-slate-900 leading-snug">
+                        Garri AI bilan suhbat
+                      </h4>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Ovozli nutq qabul qilish va xatolarni tahlil qilish.
+                      </p>
+                    </div>
 
-                        return (
-                          <div
-                            key={mod.id}
-                            onClick={() => setActiveTab("curriculum")}
-                            className="p-5 rounded-[24px] bg-[#FAFAF9] hover:bg-white border border-stone-200/70 hover:border-yellow-300 transition-all cursor-pointer space-y-3 group"
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-black uppercase text-[#CA8A04] bg-[#FEF9C3] px-2.5 py-0.5 rounded-full">
-                                {mod.levelBadge}
-                              </span>
-                              <span className="text-xs font-bold text-slate-400">
-                                {modCompleted} / {modLessons.length}
-                              </span>
-                            </div>
-                            <div>
-                              <h4 className="font-serif font-black text-slate-900 group-hover:text-yellow-600 transition-colors">
-                                {mod.titleUz}
-                              </h4>
-                              <p className="text-xs text-slate-500 line-clamp-2 mt-1">
-                                {mod.description}
-                              </p>
-                            </div>
-                            <div className="pt-2 border-t border-slate-200/50 flex items-center justify-between text-xs font-bold">
-                              <span className={isModDone ? "text-emerald-700" : "text-slate-500"}>
-                                {isModDone ? "Tamomlandi ✓" : "Jarayonda"}
-                              </span>
-                              <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-1 transition-transform" />
-                            </div>
-                          </div>
-                        );
-                      })}
+                    <div className="pt-3 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("garri")}
+                        className="w-full py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>Suhbatni boshlash</span>
+                      </button>
                     </div>
                   </div>
                 </div>
+
+                {/* 4. 6 MODULES QUICK ROADMAP PREVIEW */}
+                <section className="max-w-4xl mx-auto w-full bg-white rounded-2xl p-6 sm:p-8 border border-stone-200/80 shadow-md space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-serif text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                        Bosqichlar Ketma-ketligi
+                      </h3>
+                      <p className="text-xs sm:text-sm text-slate-500 font-medium">
+                        Har bir modul yakunida Garri AI bilan imtihon suhbati o‘tkaziladi.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("curriculum")}
+                      className="text-xs font-bold text-yellow-900 bg-[#FFFBEB] hover:bg-[#FEF08A] px-4 py-2 rounded-xl border border-yellow-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <span>Barcha darslar</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {curriculumModulesMeta.map((mod) => {
+                      const modLessons = curriculumLessons.filter((l) => l.moduleId === mod.id);
+                      const modCompleted = modLessons.filter((l) =>
+                        completedLessonIds.includes(l.id)
+                      ).length;
+                      const isModDone = modCompleted === modLessons.length;
+
+                      return (
+                        <div
+                          key={mod.id}
+                          onClick={() => setActiveTab("curriculum")}
+                          className="p-5 rounded-2xl bg-[#FAFAF9] hover:bg-white border border-stone-200/70 hover:border-yellow-300 transition-all cursor-pointer space-y-3 group"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-black uppercase text-[#CA8A04] bg-[#FEF9C3] px-2.5 py-0.5 rounded-full">
+                              {mod.levelBadge}
+                            </span>
+                            <span className="text-xs font-bold text-slate-400">
+                              {modCompleted} / {modLessons.length}
+                            </span>
+                          </div>
+                          <div>
+                            <h4 className="font-serif font-black text-slate-900 group-hover:text-yellow-600 transition-colors">
+                              {mod.titleUz}
+                            </h4>
+                            <p className="text-xs text-slate-500 line-clamp-2 mt-1">
+                              {mod.description}
+                            </p>
+                          </div>
+                          <div className="pt-2 border-t border-slate-200/50 flex items-center justify-between text-xs font-bold">
+                            <span className={isModDone ? "text-emerald-700" : "text-slate-500"}>
+                              {isModDone ? "Tamomlandi ✓" : "Jarayonda"}
+                            </span>
+                            <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-1 transition-transform" />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+
+                {/* 5. FAQ ACCORDION SECTION */}
+                <section className="max-w-4xl mx-auto w-full bg-white rounded-2xl p-6 sm:p-8 border border-stone-200/80 shadow-md space-y-5">
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-800 text-xs font-black mb-2">
+                      <HelpCircle className="w-3.5 h-3.5 text-slate-600" />
+                      <span>Yordam va Javoblar</span>
+                    </div>
+                    <h3 className="font-serif text-2xl font-black text-slate-900 tracking-tight">
+                      Ko‘p beriladigan savollar (FAQ)
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-500 font-medium">
+                      Platformadan foydalanish, darslar ketma-ketligi va Garri AI bo‘yicha muhim savollarga javoblar.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    {faqData.map((faq, idx) => {
+                      const isOpen = openFaqIndex === idx;
+                      return (
+                        <div
+                          key={idx}
+                          className="border border-stone-200/80 rounded-2xl overflow-hidden transition-all bg-[#FFFDF9]"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
+                            className="w-full p-4 sm:p-5 text-left flex items-center justify-between gap-4 cursor-pointer hover:bg-amber-50/40 transition-colors"
+                          >
+                            <span className="font-bold text-xs sm:text-sm text-slate-900 leading-snug">
+                              {faq.q}
+                            </span>
+                            <ChevronDown
+                              className={`w-4 h-4 text-slate-500 flex-shrink-0 transition-transform duration-200 ${
+                                isOpen ? "rotate-180 text-yellow-600" : ""
+                              }`}
+                            />
+                          </button>
+
+                          {isOpen && (
+                            <div className="px-4 pb-4 sm:px-5 sm:pb-5 pt-0 text-xs sm:text-sm text-slate-600 font-medium leading-relaxed border-t border-slate-100/80">
+                              {faq.a}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
               </motion.div>
             )}
 

@@ -255,27 +255,34 @@ export const GarriAIChat: React.FC<GarriAIChatProps> = ({
       }
 
       const data = await res.json();
-      const replyText = data.aiReplyEnglish || data.reply;
-      const explanation = data.explanation || data.uzbekExplanation;
-      const replyTranslation = data.replyTranslation || data.aiReplyUzbek || data.replyUz;
+      const replyText = data.replyEn || data.aiReplyEnglish || data.reply || "";
+      const correctedSentence = data.correctedSentence || data.correctedText || "";
+      const explanation = data.explanationUz || data.explanation || data.uzbekExplanation || "";
+      const replyTranslation = data.replyUz || data.replyTranslation || data.aiReplyUzbek || "";
+      const grammarScore = Number(data.grammarScore ?? data.scores?.grammar ?? 85);
+      const fluencyScore = Number(data.fluencyScore ?? data.scores?.fluency ?? 85);
 
       const garriMsg: ChatMessage = {
         id: `g-${Date.now()}`,
         sender: "garri",
         text: replyText,
-        correctedText: data.correctedText,
+        correctedText: correctedSentence,
         explanation,
         replyTranslation,
         translationUz: replyTranslation,
-        scores: data.scores,
+        scores: {
+          grammar: grammarScore,
+          fluency: fluencyScore,
+          vocab: Number(data.scores?.vocab) || Math.round((grammarScore + fluencyScore) / 2),
+        },
         analysis: data.analysis || {
-          hasError: (data.correctedText || textToSend).trim() !== textToSend.trim(),
+          hasError: Boolean(correctedSentence && correctedSentence.trim().toLowerCase() !== textToSend.trim().toLowerCase()),
           userSaid: textToSend,
-          betterWay: data.correctedText || textToSend,
+          betterWay: correctedSentence || textToSend,
           explanationUz: explanation,
-          grammarScore: data.scores?.grammar || 90,
-          vocabularyScore: data.scores?.vocab || 88,
-          fluencyScore: data.scores?.fluency || 88,
+          grammarScore,
+          vocabularyScore: Math.round((grammarScore + fluencyScore) / 2),
+          fluencyScore,
         },
         timestamp: timeStr,
       };
@@ -422,10 +429,9 @@ export const GarriAIChat: React.FC<GarriAIChatProps> = ({
           const isEnglishAudioPlaying = activeAudioId === `${msg.id}-en`;
           const isTransAudioPlaying = activeAudioId === `${msg.id}-trans`;
 
-          const hasMistake =
+          const hasAnalysis =
             isGarri &&
-            msg.correctedText &&
-            msg.correctedText.trim().toLowerCase() !== (msg.text || "").trim().toLowerCase();
+            Boolean(msg.correctedText && (msg.explanation || msg.scores));
 
           return (
             <div
@@ -441,8 +447,8 @@ export const GarriAIChat: React.FC<GarriAIChatProps> = ({
               )}
 
               <div className={`max-w-[88%] sm:max-w-[76%] space-y-3`}>
-                {/* 1. MISTAKE CORRECTION CARD */}
-                {isGarri && hasMistake && (
+                {/* 1. MISTAKE CORRECTION & ANALYSIS CARD */}
+                {isGarri && hasAnalysis && (
                   <div className="bg-white rounded-2xl p-4 border border-stone-200/90 shadow-2xs space-y-2.5">
                     <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                       <div className="flex items-center gap-1.5 text-xs font-black text-slate-800">
